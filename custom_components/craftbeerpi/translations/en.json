@@ -1,0 +1,8 @@
+{
+  "config": {
+    "step": {"user": {"title": "CraftBeerPi 4", "description": "Adres van CraftBeerPi, bv. http://192.168.1.76:8000", "data": {"url": "Adres", "username": "Gebruikersnaam (optioneel)", "password": "Wachtwoord (optioneel)"}}},
+    "error": {"cannot_connect": "Geen verbinding met CraftBeerPi", "invalid_auth": "Geen toegang (gebruikersnaam/wachtwoord?)"},
+    "abort": {"already_configured": "Deze CraftBeerPi is al toegevoegd"}
+  },
+  "options": {"step": {"init": {"data": {"scan_interval": "Verversen (seconden)"}}}}
+}

@@ -1,0 +1,11 @@
+{
+  "domain": "craftbeerpi",
+  "name": "CraftBeerPi 4",
+  "codeowners": ["@arcidodo"],
+  "config_flow": true,
+  "documentation": "https://github.com/arcidodo/ha-craftbeerpi",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/arcidodo/ha-craftbeerpi/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
