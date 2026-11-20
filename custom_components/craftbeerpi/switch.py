@@ -26,6 +26,11 @@ class Actor(CBPiEntity, SwitchEntity):
         st = self.obj.get("state")
         return st if isinstance(st, bool) else str(st).lower() == "on"
 
+    @property
+    def extra_state_attributes(self):
+        rol, kast = self.coordinator.actor_role(self._oid)
+        return {"cbpi_soort": "actor", "rol": rol, "kast": kast}
+
     async def async_turn_on(self, **kw):
         await self.coordinator.client.post(f"/actor/{self._oid}/on")
         await self.coordinator.async_request_refresh()

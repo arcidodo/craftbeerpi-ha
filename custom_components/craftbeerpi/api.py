@@ -54,8 +54,16 @@ class CBPiClient:
 
     async def fetch_all(self) -> dict[str, Any]:
         """Alles in één keer: vergisters, ketels, actoren, sensoren (met waarde)."""
-        fermenters, kettles, actors, sensors = await asyncio.gather(
-            self.get("/fermenter/"), self.get("/kettle/"), self.get("/actor/"), self.get("/sensor/")
+        async def mash():
+            try:
+                return await self.get("/step2/")
+            except CBPiAuthError:
+                raise
+            except CBPiError:
+                return None
+
+        fermenters, kettles, actors, sensors, step2 = await asyncio.gather(
+            self.get("/fermenter/"), self.get("/kettle/"), self.get("/actor/"), self.get("/sensor/"), mash()
         )
         fermenters, kettles, actors, sensors = _rows(fermenters), _rows(kettles), _rows(actors), _rows(sensors)
         sensors = [s for s in sensors if s.get("id")]
@@ -76,7 +84,10 @@ class CBPiClient:
         vals = await asyncio.gather(*(value(s["id"]) for s in sensors))
         for s, v in zip(sensors, vals):
             s["value"] = v
+        step2 = step2 if isinstance(step2, dict) else {}
+        basic = step2.get("basic") if isinstance(step2.get("basic"), dict) else {}
         return {
+            "mash": {"name": basic.get("name"), "steps": step2.get("steps") if isinstance(step2.get("steps"), list) else []},
             "fermenters": {f["id"]: f for f in fermenters if f.get("id")},
             "kettles": {k["id"]: k for k in kettles if k.get("id")},
             "actors": {a["id"]: a for a in actors if a.get("id")},

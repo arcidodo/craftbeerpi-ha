@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.const import UnitOfTemperature
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .entity import CBPiEntity
@@ -29,6 +31,7 @@ async def async_setup_entry(hass, entry, add):
         ents += [FermSG(coord, fid), AlcoholNow(coord, fid), AlcoholFinal(coord, fid), Attenuation(coord, fid)]
     for kid in coord.data["kettles"]:
         ents.append(KettleTemp(coord, kid))
+    ents.append(MashStep(coord))
     for sid, s in coord.data["sensors"].items():
         ents.append(RawSensor(coord, sid, s))
     add(ents)
@@ -46,6 +49,12 @@ class FermTemp(CBPiEntity, SensorEntity):
     @property
     def native_value(self):
         return self.sensor_value(self.obj.get("sensor"))
+
+    @property
+    def extra_state_attributes(self):
+        f = self.obj
+        return {"cbpi_soort": "vergister", "naam": f.get("name"), "sensor_id": f.get("sensor"), "sensor2_id": f.get("sensor2"),
+                "heeft_verwarming": bool(f.get("heater")), "heeft_koeling": bool(f.get("cooler"))}
 
 
 class FermTarget(CBPiEntity, SensorEntity):
@@ -123,6 +132,11 @@ class FermStepEnd(CBPiEntity, SensorEntity):
     def native_value(self):
         return _step_end(self.obj)
 
+    @property
+    def extra_state_attributes(self):
+        s = self.coordinator.step_start(self.obj)
+        return {"start": s} if s else {}
+
 
 class KettleTemp(CBPiEntity, SensorEntity):
     _attr_device_class = SensorDeviceClass.TEMPERATURE
@@ -136,6 +150,11 @@ class KettleTemp(CBPiEntity, SensorEntity):
     @property
     def native_value(self):
         return self.sensor_value(self.obj.get("sensor"))
+
+    @property
+    def extra_state_attributes(self):
+        k = self.obj
+        return {"cbpi_soort": "ketel", "naam": k.get("name"), "sensor_id": k.get("sensor"), "heeft_verwarming": bool(k.get("heater"))}
 
 
 class RawSensor(CBPiEntity, SensorEntity):
@@ -218,3 +237,34 @@ class Attenuation(CBPiEntity, SensorEntity):
         og, _ = _gl(self.coordinator, self._oid)
         sg = self.coordinator.sg_value(self._oid)
         return round(max(0.0, min(100.0, (og - sg) / (og - 1) * 100)), 1) if og and sg and og > 1.0 else None
+
+
+class MashStep(CoordinatorEntity, SensorEntity):
+    """Brouwdag (maischen/koken): actieve stap, alle stappen als attribuut."""
+    _attr_has_entity_name = True
+    _attr_name = "Actieve stap"
+    _attr_icon = "mdi:pot-steam-outline"
+
+    def __init__(self, c):
+        super().__init__(c)
+        self._attr_unique_id = f"{c.config_entry.entry_id}_brouwdag_step"
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, f"{c.config_entry.entry_id}_brouwdag")}, name="Brouwdag", manufacturer="CraftBeerPi 4", model="Brouwdag")
+
+    @property
+    def _steps(self):
+        return ((self.coordinator.data or {}).get("mash") or {}).get("steps") or []
+
+    @property
+    def native_value(self):
+        st = next((s for s in self._steps if s.get("status") == "A"), None)
+        return st.get("name") if st else "Geen"
+
+    @property
+    def extra_state_attributes(self):
+        st = next((s for s in self._steps if s.get("status") == "A"), None)
+        return {
+            "cbpi_soort": "brouwdag",
+            "naam": ((self.coordinator.data or {}).get("mash") or {}).get("name") or "Brouwdag",
+            "status_tekst": (st or {}).get("state_text"),
+            "stappen": [{"naam": s.get("name"), "status": s.get("status"), "status_tekst": s.get("state_text"), "type": s.get("type")} for s in self._steps],
+        }
